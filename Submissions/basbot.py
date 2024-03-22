@@ -10,8 +10,8 @@ from gameSettings import HP, LEFTBORDER, RIGHTBORDER, LEFTSTART, RIGHTSTART, PAR
 # SECONDARY CAN BE : Hadoken, Grenade, Boomerang, Bear Trap
 
 # TODO FOR PARTICIPANT: Set primary and secondary skill here
-PRIMARY_SKILL = TeleportSkill
-SECONDARY_SKILL = Hadoken
+PRIMARY_SKILL = Hadoken
+SECONDARY_SKILL = Uppercut
 
 #constants, for easier move return
 #movements
@@ -51,6 +51,11 @@ class Script:
 
         if distance == 1:
             return LIGHT
-        
+        elif Stun == True:
+            return HEAVY
+        elif enemy == JUMP and distance == 1:
+            return self.secondary
+        elif distance == 1 and enemy == LIGHT:
+            return BLOCK
         return FORWARD
         
