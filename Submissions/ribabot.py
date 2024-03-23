@@ -5,7 +5,7 @@ from ScriptingHelp.usefulFunctions import *
 from Game.playerActions import defense_actions, attack_actions, projectile_actions
 from Game.gameSettings import HP, LEFTBORDER, RIGHTBORDER, LEFTSTART, RIGHTSTART, PARRYSTUN
 from random import randint, random
-
+import itertools
 # Define your Q-Learning agent class
 class QLearningAgent:
     def __init__(self, num_actions, num_states, initial_epsilon=1.0, min_epsilon=0.01, decay_rate=0.995,
@@ -18,7 +18,21 @@ class QLearningAgent:
         self.min_epsilon = min_epsilon
         self.decay_rate = decay_rate
         self.q_table = [[0] * num_actions for _ in range(num_states)]
+        self.game_history = []
+        
+    def update_q_table_from_history(self, reward):
+        """
+        Update Q-table based on the game history.
+        """
+        for state, action in self.game_history:
+            self.q_table[state][action] += self.learning_rate * (reward - self.q_table[state][action])
 
+    def clear_game_history(self):
+        """
+        Clear game history after updating Q-table.
+        """
+        self.game_history = []
+        
     def choose_action(self, state):
         if random() < self.epsilon:
             return randint(0, self.num_actions - 1)  
@@ -68,8 +82,7 @@ NOMOVE = "NoMove"
 moves = SECONDARY,
 moves_iter = iter(moves)
 
-
-agent = QLearningAgent(num_actions=12, num_states=2) 
+agent = QLearningAgent(num_actions=13, num_states=2) 
 
 # TODO FOR PARTICIPANT: WRITE YOUR WINNING BOT
 class Script:
@@ -78,7 +91,9 @@ class Script:
         self.secondary = SECONDARY_SKILL
         self.previous_state = None
         self.previous_action = None
-        self.previous_player_hp = 0 
+        self.previous_player_hp = 0
+        self.previous_enemy_hp = 0
+        self.training_steps = 0 
     # DO NOT TOUCH
     def init_player_skills(self):
         return self.primary, self.secondary
@@ -89,8 +104,8 @@ class Script:
             return combodashattack
         else:
             return []
-            
-    def handle_enemy_projectiles(player, enemy, enemy_projectiles):
+
+    def handle_enemy_projectiles(self, player, enemy, enemy_projectiles):
         if enemy_projectiles:
             if get_projectile_type(enemy_projectiles[0]) == Grenade:
                 if get_distance(player, enemy) < 3:
@@ -99,16 +114,116 @@ class Script:
                 return JUMP_FORWARD
         return None
 
+    def game_won_by_agent(self, player, enemy):
+        return get_hp(player) > get_hp(enemy) and get_hp(enemy) <= 0
+
+    def damage_dealt_to_opponent(self, player, enemy):
+        return get_last_move(player) in (HEAVY, LIGHT, PRIMARY, SECONDARY) and self.previous_enemy_hp == get_hp(enemy)
+
+    def agent_avoids_damage(self, player, enemy, prev_player_hp):
+        return get_last_move(enemy) in (HEAVY, LIGHT, PRIMARY, SECONDARY) and prev_player_hp == get_hp(player)
+
+    def game_lost_by_agent(self, player, enemy):
+        return get_hp(player) <= 0
+
+    def agent_takes_damage(self, player, enemy):
+        return get_hp(player) < self.previous_player_hp
+
+    def agent_remains_inactive(self):
+        return self.previous_action == NOMOVE
+
+    def is_enemy_hit(self, player, enemy, enemy_projectiles):
+        if not get_block_status(enemy): 
+            player_last_move = get_last_move(player)
+            if player_last_move in (LIGHT, HEAVY) and get_distance(player, enemy) <= prim_range(player):
+                return True
+            elif player_last_move == SECONDARY:
+                for proj in enemy_projectiles:
+                    if get_projectile_type(proj) == get_secondary_skill(player):
+                        proj_pos = get_proj_pos(proj)
+                        if proj_pos[0] == get_pos(enemy)[0]:
+                            return True
+            return False
+
+    def is_hit_by_consecutive_light_attacks(self, player):
+        player_last_move = get_last_move(player)
+        if player_last_move == LIGHT:  # Check if the player's last move was a light attack
+            self.consecutive_light_hits += 1
+        else:
+            self.consecutive_light_hits = 0  # Reset consecutive hit count if last move was not a light attack
+        
+        return self.consecutive_light_hits > 1
+        
+    def calculate_reward(self, player, enemy, player_projectiles, enemy_projectiles):
+        reward = 0
+            
+        # Check if the game has been won by the agent
+        if self.game_won_by_agent(player, enemy):
+            reward += 50
+                
+        # Check if damage was dealt to the opponent
+        if self.damage_dealt_to_opponent(player, enemy):
+            reward += 15
+                
+        # Check if the agent successfully avoided taking damage
+        if self.agent_avoids_damage(player, enemy, self.previous_player_hp):
+            reward += 10
+                
+        # Check if the game was lost by the agent
+        if self.game_lost_by_agent(player, enemy):
+            reward -= 30
+                
+        # Check if the agent took damage
+        if self.agent_takes_damage(player, enemy):
+            reward -= 10
+                
+        # Penalize inactivity
+        if self.agent_remains_inactive():
+            reward -= 2
+
+        if self.is_hit_by_consecutive_light_attacks(player):
+            reward -= 5
+        return reward
+
+    
     # MAIN FUNCTION that returns a single move to the game manager
     def get_move(self, player, enemy, player_projectiles, enemy_projectiles):
         # Assuming your state space has 2 states (for demonstration)
         # You need to define your own state representation
         # Example: state = 0 if player's health is higher else 1
         state = 0 if get_hp(player) > get_hp(enemy) else 1
-
+        #agent.decay_epsilon() 
         # Choose action using Q-Learning agent
         action = agent.choose_action(state)
         self.previous_player_hp = get_hp(player)
+        self.previous_enemy_hp = get_hp(enemy)
+        # Check for combo actions
+        is_jumping = get_last_move(player) in JUMP
+        is_enemy_jumping = get_last_move(enemy) in JUMP
+        combo_actions = [
+            ([PRIMARY], lambda distance, is_jumping: distance < 7 and not is_jumping),
+            ([SECONDARY], lambda is_enemy_jumping, is_jumping: is_enemy_jumping and is_jumping),
+            ([SECONDARY], lambda is_enemy_jumping, is_jumping: not is_enemy_jumping and not is_jumping),
+            ([PRIMARY, LIGHT], lambda distance, is_jumping: distance < 7 and not is_jumping),
+            ([SECONDARY, LIGHT], lambda is_enemy_jumping, is_jumping: is_enemy_jumping and is_jumping),
+            ([PRIMARY, HEAVY], lambda distance, is_jumping: distance < 7 and not is_jumping),
+            ([SECONDARY, HEAVY], lambda is_enemy_jumping, is_jumping: is_enemy_jumping and is_jumping),
+            ([PRIMARY, BLOCK], lambda distance, is_jumping: distance < 7 and not is_jumping),
+            ([SECONDARY, BLOCK], lambda is_enemy_jumping, is_jumping: is_enemy_jumping and is_jumping),
+            ([PRIMARY, JUMP_FORWARD], lambda distance, is_jumping: False),
+            ([PRIMARY, JUMP_BACKWARD], lambda distance, is_jumping: False),
+            ([SECONDARY, JUMP_FORWARD], lambda is_enemy_jumping, is_jumping: is_enemy_jumping and not is_jumping),
+            ([SECONDARY, JUMP_BACKWARD], lambda is_enemy_jumping, is_jumping: is_enemy_jumping and not is_jumping),
+            ([PRIMARY, PRIMARY], lambda distance, is_jumping: distance < 7 and not is_jumping),
+            ([SECONDARY, PRIMARY], lambda is_enemy_jumping, is_jumping: is_enemy_jumping and is_jumping),
+            ([PRIMARY, SECONDARY], lambda distance, is_jumping: distance < 7 and not is_jumping),
+            ([SECONDARY, SECONDARY], lambda is_enemy_jumping, is_jumping: is_enemy_jumping and is_jumping),
+            ([PRIMARY, CANCEL], lambda distance, is_jumping: distance < 7 and not is_jumping),
+            ([SECONDARY, CANCEL], lambda is_enemy_jumping, is_jumping: is_enemy_jumping and is_jumping),
+            ([PRIMARY, NOMOVE], lambda distance, is_jumping: distance < 7 and not is_jumping),
+            ([SECONDARY, NOMOVE], lambda is_enemy_jumping, is_jumping: is_enemy_jumping and is_jumping)
+        ]
+        #action
         # Execute action based on chosen action
         if action == 0:
             move = FORWARD
@@ -136,20 +251,16 @@ class Script:
             move = self.combo(get_distance(player, enemy), get_block_status(enemy))
         elif action ==12:
             move = self.handle_enemy_projectiles(player, enemy, enemy_projectiles)
+        elif action == 13:
+            for combo_action, condition in combo_actions:
+                if condition(get_distance(player, enemy), is_jumping):
+                    move = combo_action
+                    break
         else:
-            move = NOMOVE
-
+            move = NOMOVE     
         # Update Q-table if this is not the first move
         if self.previous_state is not None:
-            reward = 0  # Define your own reward mechanism based on game state
-            if get_hp(enemy) < get_hp(player):
-                reward += 1
-            if get_hp(player) < get_hp(enemy):
-                reward -= 1
-            if get_landed(enemy):
-                reward += 1
-            if enemy_projectiles and get_hp(player) >= self.previous_player_hp:
-                reward += 1 
+            reward = self.calculate_reward(player, enemy, player_projectiles, enemy_projectiles)
             agent.update_q_table(self.previous_state, self.previous_action, reward, state)
         
         # Store current state and action as previous state and action for the next iteration
@@ -157,3 +268,15 @@ class Script:
         self.previous_action = action
 
         return move
+
+         # Update Q-table if this is not the first move
+        if self.previous_state is not None:
+            reward = self.calculate_reward(player, enemy, player_projectiles, enemy_projectiles)
+            agent.update_q_table(self.previous_state, self.previous_action, reward, state)
+        
+        # Store current state and action as previous state and action for the next iteration
+        self.previous_state = state
+        self.previous_action = action
+
+        return move
+
