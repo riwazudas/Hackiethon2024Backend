@@ -47,34 +47,54 @@ class Script:
     
     # MAIN FUNCTION that returns a single move to the game manager
     def get_move(self, player, enemy, player_projectiles, enemy_projectiles):
-        distance = abs(get_pos(player)[0] - get_pos(enemy)[0])
-        enemystun_time = abs(get_stun_duration(enemy))
-        lastmove = get_last_move(enemy)
-        enemyhp = abs(get_hp(enemy))
-        ourhp = abs(get_hp(player))
+        distance = abs(get_distance(player, enemy))
+        enemystun_time = get_stun_duration(enemy)
+        enemylastmove = get_last_move(enemy)
+        ourlastmove = get_last_move(player)
+        enemyhp = get_hp(enemy)
+        ourhp = get_hp(player)
         enemyblockstatus = get_block_status(enemy)
-        enemyprojpos = get_proj_pos(enemy)[0]
+        enemyprojpos = get_proj_pos(enemy)[0] if enemy_projectiles else float('inf')
+        enemyprimarycd = primary_on_cooldown(enemy)
+        enemysecondcd = secondary_on_cooldown(enemy)
+        enemyheavycd = heavy_on_cooldown(enemy)
+        enemyprimaryrange = prim_range(enemy)
+        enemysecondaryrange = seco_range(enemy)
+        ourprimarycd = primary_on_cooldown(player)  
+        oursecondcd = secondary_on_cooldown(player)  
+        ourheavycd = heavy_on_cooldown(player)  
+        ourprimaryrange = prim_range(player)  
+        oursecondaryrange = seco_range(player) 
+
+
 
         # Define a list of possible moves to choose from
         possible_moves = []
 
+        # Projectile defense
+        if enemy_projectiles:
+            for projectile in enemy_projectiles:
+                proj_distance = abs(get_proj_pos(projectile)[0] - get_pos(player)[0])
+                if proj_distance == 2:
+                    possible_moves.append(BLOCK)
+
         # Defensive moves
         if enemyblockstatus:
-            possible_moves.append(BLOCK)
-        elif distance == 1 and enemy == JUMP:
-            possible_moves.append(BLOCK)
+            possible_moves.append(HEAVY)
+        elif distance == 1 and enemylastmove == JUMP:
+            possible_moves.append(JUMP_BACKWARD)
 
         # Offensive moves
         if distance == 1:
-            if lastmove == LIGHT and ourhp < 90:
+            if enemylastmove == LIGHT and ourhp < 90:
                 possible_moves.append(HEAVY)
-            elif lastmove == LIGHT and ourhp < 98:
+            elif enemylastmove == LIGHT and ourhp < 98:
                 possible_moves.append(LIGHT)
             elif enemystun_time >= 1:
                 possible_moves.append(HEAVY)
-            elif enemy == JUMP:
+            elif enemylastmove == JUMP:
                 possible_moves.append(self.primary)
-            elif enemy == LIGHT:
+            elif enemylastmove == LIGHT:
                 possible_moves.append(BLOCK)
 
         # Skill usage based on different conditions
@@ -82,12 +102,12 @@ class Script:
             possible_moves.append(SECONDARY)
         if ourhp < 30:
             possible_moves.append(PRIMARY)
+
         # Combination of Dash Attack Skill
         combodashattack = [BACK, JUMP_BACKWARD, SECONDARY]
-        combodashattack_index = 0
-           # Check if combo move can be executed
         if distance <= 5 and not enemyblockstatus:
             possible_moves.extend(combodashattack)
+
         # Movement
         if not possible_moves:
             if distance == 1:
@@ -110,6 +130,9 @@ class Script:
                 # Reset combo index if the sequence is broken
                 combo_index = 0
 
+        # Avoid using HADOKEN while jumping and only if enemy's position is <= 5
+        if self.secondary == Hadoken and ourlastmove != JUMP and enemyprojpos <= 5:
+            possible_moves.append(SECONDARY)
+
         # Randomly choose from possible moves if combo is not available or completed
         return choice(possible_moves)
-            
