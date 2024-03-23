@@ -35,7 +35,7 @@ class QLearningAgent:
 # SECONDARY CAN BE : Hadoken, Grenade, Boomerang, Bear Trap
 
 # TODO FOR PARTICIPANT: Set primary and secondary skill here
-PRIMARY_SKILL = TeleportSkill
+PRIMARY_SKILL = DashAttackSkill
 SECONDARY_SKILL = Hadoken
 
 #constants, for easier move return
@@ -73,7 +73,13 @@ class Script:
     # DO NOT TOUCH
     def init_player_skills(self):
         return self.primary, self.secondary
-    
+
+    def combo(self, distance, enemyblockstatus):
+        combodashattack = [BACK, JUMP_BACKWARD, SECONDARY]
+        if distance <= 5 and not enemyblockstatus:
+            return combodashattack
+        else:
+            return []
     # MAIN FUNCTION that returns a single move to the game manager
     def get_move(self, player, enemy, player_projectiles, enemy_projectiles):
         # Assuming your state space has 2 states (for demonstration)
@@ -107,15 +113,23 @@ class Script:
             move = SECONDARY
         elif action ==10:
             move = CANCEL
+        elif action ==11:
+            move = self.combo(get_distance(player, enemy), get_block_status(enemy))
         else:
             move = NOMOVE
 
         # Update Q-table if this is not the first move
-        if get_landed(enemy):
-            reward += 1  # Define your own reward mechanism based on game state
+        if self.previous_state is not None:
+            reward = 0  # Define your own reward mechanism based on game state
+            if get_landed(enemy):
+                reward += 1  
+            if get_landed(player):
+                reward -= 1
+            if get_landed(player):
+                reward -= 1  
             agent.update_q_table(self.previous_state, self.previous_action, reward, state)
-       
-       # Store current state and action as previous state and action for the next iteration
+        
+        # Store current state and action as previous state and action for the next iteration
         self.previous_state = state
         self.previous_action = action
 
