@@ -61,21 +61,22 @@ class Script:
                 if get_distance(player,enemy)<3:
                     return JUMP_BACKWARD
             else:
-                return BLOCK
-        
+                return JUMP_FORWARD
+        if enemy_distance<3 :
+            return JUMP_BACKWARD
         if enemy_distance>3 and not secondary_on_cooldown:
             return SECONDARY
         
-        if enemy_distance==5 and not primary_on_cooldown:
+        if enemy_distance<5 and not primary_on_cooldown:
             return PRIMARY
 
         if enemy_distance<2 and not heavy_on_cooldown:
-            return heavy_combo()
+            return HEAVY
             
-        if get_distance(player,enemy)<2:
+        if get_distance(player,enemy)==1:
             return LIGHT
-        
-        return NOMOVE
+
+        return LIGHT
             
 
 

@@ -62,7 +62,7 @@ moves = SECONDARY,
 moves_iter = iter(moves)
 
 
-agent = QLearningAgent(num_actions=11, num_states=2) 
+agent = QLearningAgent(num_actions=12, num_states=2) 
 
 # TODO FOR PARTICIPANT: WRITE YOUR WINNING BOT
 class Script:
@@ -121,12 +121,10 @@ class Script:
         # Update Q-table if this is not the first move
         if self.previous_state is not None:
             reward = 0  # Define your own reward mechanism based on game state
-            if get_landed(enemy):
-                reward += 1  
-            if get_landed(player):
+            if get_hp(enemy) < get_hp(player):
+                reward += 1
+            if get_hp(player) < get_hp(enemy):
                 reward -= 1
-            if get_landed(player):
-                reward -= 1  
             agent.update_q_table(self.previous_state, self.previous_action, reward, state)
         
         # Store current state and action as previous state and action for the next iteration
