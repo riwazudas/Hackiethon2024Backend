@@ -62,8 +62,6 @@ class Script:
                     return JUMP_BACKWARD
             else:
                 return JUMP_FORWARD
-        if enemy_distance<3 :
-            return JUMP_BACKWARD
         if enemy_distance>3 and not secondary_on_cooldown:
             return SECONDARY
         

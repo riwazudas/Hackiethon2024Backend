@@ -69,7 +69,9 @@ class Script:
     def __init__(self):
         self.primary = PRIMARY_SKILL
         self.secondary = SECONDARY_SKILL
-        
+        self.previous_state = None
+        self.previous_action = None
+        self.previous_player_hp = 0 
     # DO NOT TOUCH
     def init_player_skills(self):
         return self.primary, self.secondary
@@ -80,6 +82,15 @@ class Script:
             return combodashattack
         else:
             return []
+    def handle_enemy_projectiles(player, enemy, enemy_projectiles):
+        if enemy_projectiles:
+            if get_projectile_type(enemy_projectiles[0]) == Grenade:
+                if get_distance(player, enemy) < 3:
+                    return JUMP_BACKWARD
+            else:
+                return JUMP_FORWARD
+        return None
+
     # MAIN FUNCTION that returns a single move to the game manager
     def get_move(self, player, enemy, player_projectiles, enemy_projectiles):
         # Assuming your state space has 2 states (for demonstration)
@@ -89,7 +100,7 @@ class Script:
 
         # Choose action using Q-Learning agent
         action = agent.choose_action(state)
-
+        self.previous_player_hp = get_hp(player)
         # Execute action based on chosen action
         if action == 0:
             move = FORWARD
@@ -115,6 +126,8 @@ class Script:
             move = CANCEL
         elif action ==11:
             move = self.combo(get_distance(player, enemy), get_block_status(enemy))
+        elif action ==12:
+            move = self.handle_enemy_projectiles(player, enemy, enemy_projectiles)
         else:
             move = NOMOVE
 
@@ -125,6 +138,10 @@ class Script:
                 reward += 1
             if get_hp(player) < get_hp(enemy):
                 reward -= 1
+            if get_landed(enemy):
+                reward += 1
+            if enemy_projectiles and get_hp(player) >= self.previous_player_hp:
+                reward += 1 
             agent.update_q_table(self.previous_state, self.previous_action, reward, state)
         
         # Store current state and action as previous state and action for the next iteration
