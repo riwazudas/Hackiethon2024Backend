@@ -10,8 +10,8 @@ from gameSettings import HP, LEFTBORDER, RIGHTBORDER, LEFTSTART, RIGHTSTART, PAR
 # SECONDARY CAN BE : Hadoken, Grenade, Boomerang, Bear Trap
 
 # TODO FOR PARTICIPANT: Set primary and secondary skill here
-PRIMARY_SKILL = Hadoken
-SECONDARY_SKILL = Uppercut
+PRIMARY_SKILL = UppercutSkill
+SECONDARY_SKILL = Hadoken
 
 #constants, for easier move return
 #movements
@@ -48,13 +48,27 @@ class Script:
     # MAIN FUNCTION that returns a single move to the game manager
     def get_move(self, player, enemy, player_projectiles, enemy_projectiles):
         distance = abs(get_pos(player)[0] - get_pos(enemy)[0])
+        enemystun_time = abs(get_stun_duration(enemy))
+        lastmove = get_last_move(enemy)
+        enemyhp = abs(get_hp(enemy))
+        ourhp = abs(get_hp(player))
+        enemyblockstatus = get_block_status(enemy)
+        enemyprojpos = get_proj_pos(enemy)[0]
 
-        if distance == 1:
+        if distance == 1 and player_projectiles == True:
+            return BLOCK
+        elif distance == 1 and lastmove == LIGHT:
+            return BLOCK
+        elif distance == 1 and lastmove == LIGHT and ourhp<98:
             return LIGHT
-        elif Stun == True:
+        elif distance == 1 and lastmove == LIGHT and ourhp<90:
+            return HEAVY
+        elif distance == 1 and lastmove == LIGHT and ourhp<90:
+            return BACK
+        elif enemystun_time >=1 and distance == 1:
             return HEAVY
         elif enemy == JUMP and distance == 1:
-            return self.secondary
+            return self.primary
         elif distance == 1 and enemy == LIGHT:
             return BLOCK
         return FORWARD
