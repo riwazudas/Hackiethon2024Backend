@@ -4,13 +4,13 @@ from Game.projectiles import *
 from ScriptingHelp.usefulFunctions import *
 from Game.playerActions import defense_actions, attack_actions, projectile_actions
 from gameSettings import HP, LEFTBORDER, RIGHTBORDER, LEFTSTART, RIGHTSTART, PARRYSTUN
-
+from random import choice
 
 # PRIMARY CAN BE: Teleport, Super Saiyan, Meditate, Dash Attack, Uppercut, One Punch
 # SECONDARY CAN BE : Hadoken, Grenade, Boomerang, Bear Trap
 
 # TODO FOR PARTICIPANT: Set primary and secondary skill here
-PRIMARY_SKILL = UppercutSkill
+PRIMARY_SKILL = DashAttackSkill
 SECONDARY_SKILL = Hadoken
 
 #constants, for easier move return
@@ -55,21 +55,61 @@ class Script:
         enemyblockstatus = get_block_status(enemy)
         enemyprojpos = get_proj_pos(enemy)[0]
 
-        if distance == 1 and player_projectiles == True:
-            return BLOCK
-        elif distance == 1 and lastmove == LIGHT:
-            return BLOCK
-        elif distance == 1 and lastmove == LIGHT and ourhp<98:
-            return LIGHT
-        elif distance == 1 and lastmove == LIGHT and ourhp<90:
-            return HEAVY
-        elif distance == 1 and lastmove == LIGHT and ourhp<90:
-            return BACK
-        elif enemystun_time >=1 and distance == 1:
-            return HEAVY
-        elif enemy == JUMP and distance == 1:
-            return self.primary
-        elif distance == 1 and enemy == LIGHT:
-            return BLOCK
-        return FORWARD
-        
+        # Define a list of possible moves to choose from
+        possible_moves = []
+
+        # Defensive moves
+        if enemyblockstatus:
+            possible_moves.append(BLOCK)
+        elif distance == 1 and enemy == JUMP:
+            possible_moves.append(BLOCK)
+
+        # Offensive moves
+        if distance == 1:
+            if lastmove == LIGHT and ourhp < 90:
+                possible_moves.append(HEAVY)
+            elif lastmove == LIGHT and ourhp < 98:
+                possible_moves.append(LIGHT)
+            elif enemystun_time >= 1:
+                possible_moves.append(HEAVY)
+            elif enemy == JUMP:
+                possible_moves.append(self.primary)
+            elif enemy == LIGHT:
+                possible_moves.append(BLOCK)
+
+        # Skill usage based on different conditions
+        if enemyhp < 50:
+            possible_moves.append(SECONDARY)
+        if ourhp < 30:
+            possible_moves.append(PRIMARY)
+        # Combination of Dash Attack Skill
+        combodashattack = [BACK, JUMP_BACKWARD, SECONDARY]
+        combodashattack_index = 0
+           # Check if combo move can be executed
+        if distance <= 5 and not enemyblockstatus:
+            possible_moves.extend(combodashattack)
+        # Movement
+        if not possible_moves:
+            if distance == 1:
+                possible_moves.append(BACK)
+            else:
+                possible_moves.append(FORWARD)
+
+        # Combo move: Light attack, Heavy attack, Secondary skill
+        combo_sequence = [LIGHT, HEAVY, SECONDARY]
+        combo_index = 0
+
+        # Check if the next move in the combo sequence is available
+        if len(possible_moves) > 0 and possible_moves[0] in combo_sequence:
+            if possible_moves[0] == combo_sequence[combo_index]:
+                combo_index += 1
+                if combo_index == len(combo_sequence):
+                    # Execute the combo move
+                    return combo_sequence
+            else:
+                # Reset combo index if the sequence is broken
+                combo_index = 0
+
+        # Randomly choose from possible moves if combo is not available or completed
+        return choice(possible_moves)
+            
