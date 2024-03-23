@@ -10,10 +10,10 @@ from random import sample
 from collections import deque
 # Define your Q-Learning agent class
 from collections import deque
-
+import json
 class QLearningAgent:
     def __init__(self, num_actions, num_states, initial_epsilon=0.5, min_epsilon=0.01, decay_rate=0.995,
-                 learning_rate=0.1, discount_factor=0.3, memory_capacity=10000, batch_size=32):
+                 learning_rate=0.4, discount_factor=0.3, memory_capacity=10000, batch_size=32):
         self.num_actions = num_actions
         self.num_states = num_states
         self.learning_rate = learning_rate
@@ -299,6 +299,5 @@ class Script:
         self.previous_action = action
         agent.learn_from_replay()
         return move
-
 
 

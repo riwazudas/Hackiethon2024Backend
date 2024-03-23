@@ -398,5 +398,16 @@ def startGame(path1, path2, submissionpath, roundNum):
     return winner
     
 # Allows to run directly from GameManager to simulate single rounds
+# if __name__ == "__main__":
+#     round_num = 1
+#     winner = None
+    
+#     # Run tests until player1 wins
+#     while winner != PATH1:
+#         print(f"Round {round_num}:")
+#         winner = startGame(PATH1, PATH2, SUBMISSIONPATH, round_num)
+#         round_num += 1
+        
+#     print(f"{PATH1} won after {round_num - 1} rounds!")
 if __name__ == "__main__":
     startGame(PATH1, PATH2, SUBMISSIONPATH, 1)
