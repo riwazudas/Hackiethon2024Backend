@@ -8,12 +8,15 @@ from random import randint, random
 
 # Define your Q-Learning agent class
 class QLearningAgent:
-    def __init__(self, num_actions, num_states, learning_rate=0.1, discount_factor=0.9, epsilon=0.1):
+    def __init__(self, num_actions, num_states, initial_epsilon=1.0, min_epsilon=0.01, decay_rate=0.995,
+                 learning_rate=0.1, discount_factor=0.9):
         self.num_actions = num_actions
         self.num_states = num_states
         self.learning_rate = learning_rate
         self.discount_factor = discount_factor
-        self.epsilon = epsilon
+        self.epsilon = initial_epsilon
+        self.min_epsilon = min_epsilon
+        self.decay_rate = decay_rate
         self.q_table = [[0] * num_actions for _ in range(num_states)]
 
     def choose_action(self, state):
@@ -30,6 +33,10 @@ class QLearningAgent:
         td_target = reward + self.discount_factor * self.q_table[next_state][best_next_action]
         td_error = td_target - self.q_table[state][action]
         self.q_table[state][action] += self.learning_rate * td_error
+
+    def decay_epsilon(self):
+        self.epsilon = max(self.min_epsilon, self.epsilon * self.decay_rate)
+
 
 # PRIMARY CAN BE: Teleport, Super Saiyan, Meditate, Dash Attack, Uppercut, One Punch
 # SECONDARY CAN BE : Hadoken, Grenade, Boomerang, Bear Trap
@@ -82,6 +89,7 @@ class Script:
             return combodashattack
         else:
             return []
+            
     def handle_enemy_projectiles(player, enemy, enemy_projectiles):
         if enemy_projectiles:
             if get_projectile_type(enemy_projectiles[0]) == Grenade:
